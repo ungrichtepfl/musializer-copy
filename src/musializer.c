@@ -626,9 +626,9 @@ static double TIC = -DBL_MAX;
 #if FOR_WASM
 #include <stdatomic.h>
 
-atomic_int_fast8_t stop_game = 0;
+atomic_int_fast8_t wasmStopGame = 0;
 
-void send_stop_game(void) { stop_game = 1; }
+void sendStopGame(void) { wasmStopGame = 1; }
 
 #endif // FOR_WASM
 
@@ -642,7 +642,7 @@ void update(void) {
   }
 
 #if FOR_WASM
-  if (stop_game) {
+  if (wasmStopGame) {
     // Quit
     STATE->finished = true;
     return;
