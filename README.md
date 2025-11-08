@@ -8,7 +8,7 @@ Inspiration from [Tsoding the Legend](https://www.youtube.com/watch?v=Xdbk1Pr5WX
 
 ## Raylib
 
-Raylib version [5.0.0](https://github.com/raysan5/raylib/releases/tag/5.0.0) is needed.
+Raylib version [5.5](https://github.com/raysan5/raylib/releases/tag/5.5) is needed.
 
 See [raylib](https://www.raylib.com/) for installation.
 
@@ -54,7 +54,10 @@ To build for web run:
 ```
 
 You need to have the [emscripten](https://emscripten.org/) toolchain installed.
-The compilation was tested using emcc version `4.0.2 (7591f1c5ea0adf6f4293cfba2995ee9700aa0d93)`.
+The compilation was works using emcc version `4.0.2 (7591f1c5ea0adf6f4293cfba2995ee9700aa0d93)`.
+
+> [!Warning]
+> Somehow 4.0.19 does not work, maybe this is a bug and will be fixed in newer versions.
 
 ## Test files
 

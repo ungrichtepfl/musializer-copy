@@ -150,7 +150,7 @@ const MUSIALIZER *musializer = &exports;
 
 #endif // DYLIB
 
-int main(void) {
+int run_game(void) {
 
 #ifdef DYLIB
   int fd = -1;
@@ -194,3 +194,5 @@ int main(void) {
 
   return 0;
 }
+
+int main(void) { return run_game(); }

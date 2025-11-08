@@ -2,13 +2,13 @@
 #include "fft.h"
 #include <assert.h>
 #include <errno.h>
+#include <float.h>
 #include <pthread.h>
 #include <raylib.h>
 #include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <float.h>
 
 #if defined(__EMSCRIPTEN__) || defined(__wasm__) || defined(__wasm32__) ||     \
     defined(__wasm64__)
@@ -74,6 +74,7 @@ typedef struct State {
   bool useWave;
   bool showHelpInfo;
   bool showHelp;
+  bool audioInit;
   float timePlayedSeconds;
   float maxAmplitude;
   Vector2 windowPosition;
@@ -173,12 +174,12 @@ static Color lerpColorGammaCorrected(const Color color1, const Color color2,
   return linear_to_srgb(c);
 }
 
-#define RAINBOW_RED (Color){ 255, 0, 0, 255 } 
-#define RAINBOW_ORANGE (Color){ 255, 127, 0, 255 } 
-#define RAINBOW_YELLOW (Color){ 255, 255, 0, 255 } 
-#define RAINBOW_GREEN (Color){ 0, 255, 0, 255 } 
-#define RAINBOW_BLUE (Color){ 0, 0, 255, 255 } 
-#define RAINBOW_PURPLE (Color){ 255, 0, 255, 255 } 
+#define RAINBOW_RED (Color){255, 0, 0, 255}
+#define RAINBOW_ORANGE (Color){255, 127, 0, 255}
+#define RAINBOW_YELLOW (Color){255, 255, 0, 255}
+#define RAINBOW_GREEN (Color){0, 255, 0, 255}
+#define RAINBOW_BLUE (Color){0, 0, 255, 255}
+#define RAINBOW_PURPLE (Color){255, 0, 255, 255}
 
 static Color nextRainbowColor(int i, int n, bool reversed) {
 
@@ -505,7 +506,11 @@ static bool initInternal(void) {
   }
   SetConfigFlags(FLAG_MSAA_4X_HINT); // Enable anti-aliasing
   InitWindow(SCREEN_WIDTH, SCREEN_HEIGHT, "musializer");
-  InitAudioDevice();
+  // NOTE: Do not init audio here, only after the first music piece has been
+  // loaded This is needed such that it will work in the browser as well
+  // (annoying audio policies, you are not allowed to start audio before user
+  // interaction on the page).
+  STATE->audioInit = false;
 
   SetTargetFPS(FPS); // Set our game to run at 30 frames-per-second
   return true;
@@ -513,11 +518,11 @@ static bool initInternal(void) {
 
 bool init(void) {
 
+  STATE = malloc(sizeof(State));
+
   if (!initInternal()) {
     return false;
   }
-
-  STATE = malloc(sizeof(State));
 
   // No need to initialize MUSIC otherwise it segfaults
   STATE->finished = false;
@@ -549,6 +554,13 @@ static void startMusic(void) {
   unlockBuffer();
 
   if (STATE->musicFiles.count > 0) {
+    if (!STATE->audioInit) {
+      // NOTE: Only initialize audio after a user interaction. Like this it will
+      // also work in in the browser (annoying audio policies, you are not
+      // allowed to start audio before user interaction on the page).
+      InitAudioDevice();
+      STATE->audioInit = true;
+    }
     MUSIC = LoadMusicStream(
         STATE->musicFiles.paths[STATE->musicFiles.currentlyPlayed]);
     CHANNELS = MUSIC.stream.channels;
@@ -563,11 +575,11 @@ static void startMusic(void) {
 }
 
 bool resume(State *state) {
+  STATE = state;
+
   if (!initInternal()) {
     return false;
   }
-
-  STATE = state;
 
   STATE->reload = false;
   startMusic();
@@ -583,7 +595,7 @@ State *getState(void) { return STATE; }
 bool finished(void) { return STATE->finished; }
 
 static void stopMusic(void) {
-  if (IsMusicReady(MUSIC)) {
+  if (IsMusicValid(MUSIC)) {
     DetachAudioStreamProcessor(MUSIC.stream, fillSampleBuffer);
     StopMusicStream(MUSIC);
     UnloadMusicStream(MUSIC);
@@ -611,6 +623,15 @@ bool reload() { return STATE->reload; }
 
 static double TIC = -DBL_MAX;
 
+#if FOR_WASM
+#include <stdatomic.h>
+
+atomic_int_fast8_t stop_game = 0;
+
+void send_stop_game(void) { stop_game = 1; }
+
+#endif // FOR_WASM
+
 void update(void) {
 
   // Main game loop
@@ -619,6 +640,15 @@ void update(void) {
     STATE->finished = true;
     return;
   }
+
+#if FOR_WASM
+  if (stop_game) {
+    // Quit
+    STATE->finished = true;
+    return;
+  }
+
+#endif // FOR_WASM
 
 #if !FOR_WASM
   if (IsKeyPressed(KEY_Q)) {
@@ -653,7 +683,7 @@ void update(void) {
     startMusic();
   }
 
-  if (IsMusicReady(MUSIC)) {
+  if (IsMusicValid(MUSIC)) {
     UpdateMusicStream(MUSIC); // Update music buffer with new stream data
 
     // Restart music playing (stop and play)
@@ -708,7 +738,7 @@ void update(void) {
 
   ClearBackground(BLACK);
 
-  if (IsMusicReady(MUSIC)) {
+  if (IsMusicValid(MUSIC)) {
 
     drawMusic();
 
